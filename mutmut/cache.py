@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+from os.path import relpath
 from collections import defaultdict
 from difflib import SequenceMatcher, unified_diff
 from functools import wraps
@@ -270,10 +271,11 @@ def create_html_report(dict_synonyms, directory):
 
         index_file.write('Killed %s out of %s mutants' % (len([x for x in mutants if x.status == OK_KILLED]), len(mutants)))
 
-        index_file.write('<table><thead><tr><th>File</th><th>Total</th><th>Skipped</th><th>Killed</th><th>% killed</th><th>Survived</th></thead>')
+        index_file.write('<table><thead><tr><th>File</th><th>Total</th><th>Skipped</th><th>Killed</th><th>% killed</th><th>Survived</th></tr></thead><tbody>')
 
         for filename, mutants in groupby(mutants, key=lambda x: x.line.sourcefile.filename):
-            report_filename = join(directory, filename)
+            rel_path = relpath(filename, '/usr/src')
+            report_filename = join(directory, rel_path) + '.html'
 
             mutants = list(mutants)
 
@@ -281,7 +283,7 @@ def create_html_report(dict_synonyms, directory):
                 source = f.read()
 
             os.makedirs(dirname(report_filename), exist_ok=True)
-            with open(join(report_filename + '.html'), 'w') as f:
+            with open(report_filename, 'w') as f:
                 mutants_by_status = defaultdict(list)
                 for mutant in mutants:
                     mutants_by_status[mutant.status].append(mutant)
@@ -293,9 +295,9 @@ def create_html_report(dict_synonyms, directory):
                 killed = len(mutants_by_status[OK_KILLED])
                 f.write('Killed %s out of %s mutants' % (killed, len(mutants)))
 
-                index_file.write('<tr><td><a href="%s.html">%s</a></td><td>%s</td><td>%s</td><td>%s</td><td>%.2f</td><td>%s</td>' % (
-                    filename,
-                    filename,
+                index_file.write('<tr><td><a href="%s.html">%s</a></td><td>%s</td><td>%s</td><td>%s</td><td>%.2f</td><td>%s</td></tr>' % (
+                    rel_path,
+                    relpath(filename, '/usr/src/project'),
                     len(mutants),
                     len(mutants_by_status[SKIPPED]),
                     killed,
@@ -332,7 +334,31 @@ def create_html_report(dict_synonyms, directory):
 
                 f.write('</body></html>')
 
-        index_file.write('</table></body></html>')
+        index_file.write('</tbody></table></body></html>')
+
+
+@init_db
+@db_session
+def create_report():
+    results = []
+    mutants = sorted(list(select(x for x in Mutant)), key=lambda x: x.line.sourcefile.filename)
+
+    for filename, mutants in groupby(mutants, key=lambda x: x.line.sourcefile.filename):
+        mutants = list(mutants)
+        mutants_by_status = defaultdict(list)
+        for mutant in mutants:
+            mutants_by_status[mutant.status].append(mutant)
+        result = {'filename': filename, 
+               'total': len(mutants), 
+               'skipped': len(mutants_by_status[SKIPPED]),
+               'killed': len(mutants_by_status[OK_KILLED]),
+               'survived': len(mutants_by_status[BAD_SURVIVED]),
+               'suspicious': len(mutants_by_status[OK_SUSPICIOUS]),
+               'timeout': len(mutants_by_status[BAD_TIMEOUT]),
+               'killed_percent': (len(mutants_by_status[OK_KILLED]) + len(mutants_by_status[OK_SUSPICIOUS])) / len(mutants) * 100
+            }
+        results.append(result)
+    return results
 
 
 def get_or_create(model, defaults=None, **params):

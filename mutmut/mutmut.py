@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import importlib
+import inspect
 import os
 import sys
 import traceback
@@ -12,6 +14,7 @@ from pathlib import Path
 from shutil import copy
 from time import time
 from typing import List
+import json 
 
 import click
 from glob2 import glob
@@ -42,10 +45,9 @@ from mutmut.cache import (
     create_html_report,
     cached_hash_of_tests,
 )
-from mutmut.cache import print_result_cache, print_result_ids_cache, \
-    hash_of_tests, \
+from mutmut.cache import print_result_ids_cache, hash_of_tests, \
     filename_and_mutation_id_from_pk, cached_test_time, set_cached_test_time, \
-    update_line_numbers, print_result_cache_junitxml, get_unified_diff
+    update_line_numbers, create_report
 
 
 def do_apply(mutation_pk: str, dict_synonyms: List[str], backup: bool):
@@ -73,117 +75,31 @@ def do_apply(mutation_pk: str, dict_synonyms: List[str], backup: bool):
 
 null_out = open(os.devnull, 'w')
 
-DEFAULT_RUNNER = 'python -m pytest -x --assert=plain'
-
-
-@click.group(context_settings=dict(help_option_names=['-h', '--help']))
-def climain():
-    """
-    Mutation testing system for Python.
-
-    Getting started:
-
-    To run with pytest in test or tests folder: mutmut run
-
-    For more options: mutmut run --help
-
-    To show the results: mutmut results
-
-    To generate HTML report: mutmut html
-    """
-    pass
-
-
-@climain.command()
-def version():
-    """Show the version and exit."""
-    print("mutmut version {}".format(__version__))
-    sys.exit(0)
-
-
-@climain.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.argument('argument', nargs=1, required=False)
-@click.option('--paths-to-mutate', type=click.STRING)
-@click.option('--disable-mutation-types', type=click.STRING, help='Skip the given types of mutations.')
-@click.option('--enable-mutation-types', type=click.STRING, help='Only perform given types of mutations.')
-@click.option('--paths-to-exclude', type=click.STRING)
-@click.option('--runner')
-@click.option('--use-coverage', is_flag=True, default=False)
-@click.option('--use-patch-file', help='Only mutate lines added/changed in the given patch file')
-@click.option('--rerun-all', is_flag=True, default=False, help='If you modified the test_command in the pre_mutation hook, '
-                                                               'the default test_command (specified by the "runner" option) '
-                                                               'will be executed if the mutant survives with your modified test_command.')
-@click.option('--tests-dir')
-@click.option('-m', '--test-time-multiplier', default=2.0, type=float)
-@click.option('-b', '--test-time-base', default=0.0, type=float)
-@click.option('-s', '--swallow-output', help='turn off output capture', is_flag=True)
-@click.option('--dict-synonyms')
-@click.option('--pre-mutation')
-@click.option('--post-mutation')
-@click.option('--simple-output', is_flag=True, default=False, help="Swap emojis in mutmut output to plain text alternatives.")
-@click.option('--no-progress', is_flag=True, default=False, help="Disable real-time progress indicator")
-@click.option('--CI', is_flag=True, default=False, help="Returns an exit code of 0 for all successful runs and an exit code of 1 for fatal errors.")
-@config_from_file(
-    dict_synonyms='',
-    paths_to_exclude='',
-    runner=DEFAULT_RUNNER,
-    tests_dir='tests/:test/',
-    pre_mutation=None,
-    post_mutation=None,
-    use_patch_file=None,
-)
-def run(argument, paths_to_mutate, disable_mutation_types, enable_mutation_types, runner,
-        tests_dir, test_time_multiplier, test_time_base, swallow_output, use_coverage,
-        dict_synonyms, pre_mutation, post_mutation, use_patch_file, paths_to_exclude,
-        simple_output, no_progress, ci, rerun_all):
-    """
-    Runs mutmut. You probably want to start with just trying this. If you supply a mutation ID mutmut will check just this mutant.
-
-    Runs pytest by default (or unittest if pytest is unavailable) on tests in the “tests” or “test” folder.
-
-    It is recommended to configure any non-default options needed in setup.cfg or pyproject.toml, as described in the documentation.
-
-    Exit codes:
-
-     * 0 - all mutants were killed
-
-    Otherwise any or sum of any of the following exit codes:
-
-     * 1 - if a fatal error occurred
-
-     * 2 - if one or more mutants survived
-
-     * 4 - if one or more mutants timed out
-
-     * 8 - if one or more mutants caused tests to take twice as long
-
-    (This is equivalent to a bit-OR combination of the exit codes that may apply.)
-
-    With --CI flag enabled, the exit code will always be
-    1 for a fatal error or 0 for any other case.
-    """
-    if test_time_base is None:  # click sets the default=0.0 to None
-        test_time_base = 0.0
-    if test_time_multiplier is None:  # click sets the default=0.0 to None
-        test_time_multiplier = 0.0
-
-    sys.exit(do_run(argument, paths_to_mutate, disable_mutation_types, enable_mutation_types, runner,
+def run(paths_to_mutate):
+    argument = None
+    paths_to_mutate = paths_to_mutate
+    disable_mutation_types = None
+    enable_mutation_types = None
+    runner = "bash ./run_tests.sh"
+    tests_dir = "/usr/src/project/"
+    test_time_multiplier = 2.0
+    test_time_base = 0.0
+    swallow_output = None
+    use_coverage = None
+    dict_synonyms = "[Struct, NamedStruct]"
+    pre_mutation = None
+    post_mutation = None
+    use_patch_file = None
+    paths_to_exclude = ""
+    simple_output = True
+    no_progress = None
+    ci = None
+    rerun_all = None
+    do_run(argument, paths_to_mutate, disable_mutation_types, enable_mutation_types, runner,
                     tests_dir, test_time_multiplier, test_time_base, swallow_output, use_coverage,
                     dict_synonyms, pre_mutation, post_mutation, use_patch_file, paths_to_exclude,
-                    simple_output, no_progress, ci, rerun_all))
+                    simple_output, no_progress, ci, rerun_all)
 
-
-@climain.command(context_settings=dict(help_option_names=['-h', '--help']))
-def results():
-    """
-    Print the results.
-    """
-    print_result_cache()
-    sys.exit(0)
-
-
-@climain.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.argument('status', nargs=1, required=True)
 def result_ids(status):
     """
     Print the IDs of the specified mutant classes (separated by spaces).\n
@@ -196,75 +112,12 @@ def result_ids(status):
     sys.exit(0)
 
 
-@climain.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.argument('mutation-id', nargs=1, required=True)
-@click.option('--backup/--no-backup', default=False)
-@click.option('--dict-synonyms')
-@config_from_file(
-    dict_synonyms='',
-)
-def apply(mutation_id, backup, dict_synonyms):
-    """
-    Apply a mutation on disk.
-    """
-    do_apply(mutation_id, dict_synonyms, backup)
-    sys.exit(0)
 
-
-@climain.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.argument('id-or-file', nargs=1, required=False)
-@click.option('--dict-synonyms')
-@config_from_file(
-    dict_synonyms='',
-)
-def show(id_or_file, dict_synonyms):
-    """
-    Show a mutation diff.
-    """
-    if not id_or_file:
-        print_result_cache()
-        sys.exit(0)
-
-    if id_or_file == 'all':
-        print_result_cache(show_diffs=True, dict_synonyms=dict_synonyms)
-        sys.exit(0)
-
-    if os.path.isfile(id_or_file):
-        print_result_cache(show_diffs=True, only_this_file=id_or_file)
-        sys.exit(0)
-
-    print(get_unified_diff(id_or_file, dict_synonyms))
-    sys.exit(0)
-
-
-@climain.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.option('--dict-synonyms')
-@click.option('--suspicious-policy', type=click.Choice(['ignore', 'skipped', 'error', 'failure']), default='ignore')
-@click.option('--untested-policy', type=click.Choice(['ignore', 'skipped', 'error', 'failure']), default='ignore')
-@config_from_file(
-    dict_synonyms='',
-)
-def junitxml(dict_synonyms, suspicious_policy, untested_policy):
-    """
-    Show a mutation diff with junitxml format.
-    """
-    print_result_cache_junitxml(dict_synonyms, suspicious_policy, untested_policy)
-    sys.exit(0)
-
-
-@climain.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.option('--dict-synonyms')
-@click.option('-d', '--directory', help='Write the output files to DIR.')
-@config_from_file(
-    dict_synonyms='',
-    directory='html',
-)
 def html(dict_synonyms, directory):
     """
     Generate a HTML report of surviving mutants.
     """
     create_html_report(dict_synonyms, directory)
-    sys.exit(0)
 
 
 def do_run(
@@ -365,30 +218,6 @@ def do_run(
     if simple_output:
         output_legend = {key: key.upper() for (key, value) in output_legend.items()}
 
-    print("""
-- Mutation testing starting -
-
-These are the steps:
-1. A full test suite run will be made to make sure we
-   can run the tests successfully and we know how long
-   it takes (to detect infinite loops for example)
-2. Mutants will be generated and checked
-
-Results are stored in .mutmut-cache.
-Print found mutants with `mutmut results`.
-
-Legend for output:
-{killed} Killed mutants.   The goal is for everything to end up in this bucket.
-{timeout} Timeout.          Test suite took 10 times as long as the baseline so were killed.
-{suspicious} Suspicious.       Tests took a long time, but not long enough to be fatal.
-{survived} Survived.         This means your tests need to be expanded.
-{skipped} Skipped.          Skipped.
-""".format(**output_legend))
-    if runner is DEFAULT_RUNNER:
-        try:
-            import pytest  # noqa
-        except ImportError:
-            runner = 'python -m unittest'
 
     if hasattr(mutmut_config, 'init'):
         mutmut_config.init()
@@ -462,7 +291,6 @@ Legend for output:
         return compute_exit_code(progress, ci=ci)
     finally:
         print()  # make sure we end the output with a newline
-        # Close all active multiprocessing queues to avoid hanging up the main process
         close_active_queues()
 
 
@@ -538,5 +366,5 @@ def time_test_suite(
     return baseline_time_elapsed
 
 
-if __name__ == '__main__':
-    climain()
+
+

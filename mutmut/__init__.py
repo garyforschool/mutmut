@@ -568,7 +568,7 @@ def mutate(context: Context) -> Tuple[str, int]:
     :return: tuple of mutated source code and number of mutations performed
     """
     try:
-        result = parse(context.source, error_recovery=False)
+        result = parse(context.source, error_recovery=True)
     except Exception:
         print('Failed to parse {}. Internal error from parso follows.'.format(context.filename))
         print('----------------------------------')
