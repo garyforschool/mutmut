@@ -81,7 +81,7 @@ def run(paths_to_mutate):
     disable_mutation_types = None
     enable_mutation_types = None
     runner = "bash ./run_tests.sh"
-    tests_dir = "/usr/src/project/"
+    tests_dir = os.environ['PROJECT_ROOT']
     test_time_multiplier = 2.0
     test_time_base = 0.0
     swallow_output = None
