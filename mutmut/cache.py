@@ -312,6 +312,11 @@ def create_html_report(dict_synonyms, directory):
                         f.write('<h3>Mutant %s</h3>' % mutant.id)
                         f.write('<pre>%s</pre>' % diff)
 
+                if mutants_by_status[OK_KILLED]:
+                    f.write('<h2>Killed</h2>')
+                    f.write('Mutants that are killed.')
+                    print_diffs(OK_KILLED)
+
                 if mutants_by_status[BAD_TIMEOUT]:
                     f.write('<h2>Timeouts</h2>')
                     f.write('Mutants that made the test suite take a lot longer so the tests were killed.')
