@@ -19,6 +19,8 @@ import json
 import click
 from glob2 import glob
 
+from copy import copy as copy_obj
+
 from mutmut import (
     mutate_file,
     MUTANT_STATUSES,
@@ -40,6 +42,7 @@ from mutmut import (
     compute_exit_code,
     print_status,
     close_active_queues,
+    mutate
 )
 from mutmut.cache import (
     create_html_report,
@@ -75,30 +78,50 @@ def do_apply(mutation_pk: str, dict_synonyms: List[str], backup: bool):
 
 null_out = open(os.devnull, 'w')
 
-def run(paths_to_mutate):
-    argument = None
-    paths_to_mutate = paths_to_mutate
-    disable_mutation_types = None
-    enable_mutation_types = None
-    runner = "bash /usr/src/scripts/run_tests.sh"
-    tests_dir = os.environ['PROJECT_ROOT']
-    test_time_multiplier = 2.0
-    test_time_base = 0.0
-    swallow_output = None
-    use_coverage = None
-    dict_synonyms = "[Struct, NamedStruct]"
-    pre_mutation = None
-    post_mutation = None
-    use_patch_file = None
-    paths_to_exclude = ""
-    simple_output = True
-    no_progress = None
-    ci = None
-    rerun_all = None
-    do_run(argument, paths_to_mutate, disable_mutation_types, enable_mutation_types, runner,
-                    tests_dir, test_time_multiplier, test_time_base, swallow_output, use_coverage,
-                    dict_synonyms, pre_mutation, post_mutation, use_patch_file, paths_to_exclude,
-                    simple_output, no_progress, ci, rerun_all)
+
+class MutmutConfig:
+    def __init__(self):
+        self.argument = None
+        self.paths_to_mutate = None
+        self.disable_mutation_types = None
+        self.enable_mutation_types = None
+        self.runner = None
+        self.tests_dir = None
+        self.test_time_multiplier = 2.0
+        self.test_time_base = 0.0
+        self.swallow_output = None
+        self.use_coverage = None
+        self.dict_synonyms = "[Struct, NamedStruct]"
+        self.pre_mutation = None
+        self.post_mutation = None
+        self.use_patch_file = None
+        self.paths_to_exclude = ""
+        self.simple_output = True
+        self.no_progress = None
+        self.ci = None
+        self.rerun_all = None
+
+        self.save_mutation_only=False
+        self.save_mutation_to_folder=None
+        self.line_start=0
+        self.line_end=10000000
+
+    def verify(self):
+        if self.paths_to_mutate is None:
+            raise AttributeError("paths_to_mutate is required")
+        if self.runner is None:
+            self.runner = "bash /usr/src/scripts/run_tests.sh"
+        if self.tests_dir is None:
+            self.tests_dir = os.environ['PROJECT_ROOT']
+
+def run(config):
+    config.verify()
+    do_run(config.argument, config.paths_to_mutate, config.disable_mutation_types, config.enable_mutation_types, config.runner,
+           config.tests_dir, config.test_time_multiplier, config.test_time_base, config.swallow_output, config.use_coverage,
+           config.dict_synonyms, config.pre_mutation, config.post_mutation, config.use_patch_file, config.paths_to_exclude,
+           config.simple_output, config.no_progress, config.ci, config.rerun_all,
+           save_mutation_only=config.save_mutation_only, save_mutation_to_folder=config.save_mutation_to_folder, line_start=config.line_start, line_end=config.line_end)
+
 
 def result_ids(status):
     """
@@ -140,6 +163,10 @@ def do_run(
     no_progress,
     ci,
     rerun_all,
+    save_mutation_only=False,
+    save_mutation_to_folder=None,
+    line_start=0,
+    line_end=100000000, # large number to avoid skipping any lines
 ) -> int:
     """return exit code, after performing an mutation test run.
 
@@ -275,6 +302,33 @@ def do_run(
     )
 
     parse_run_argument(argument, config, dict_synonyms, mutations_by_file, paths_to_exclude, paths_to_mutate, tests_dirs)
+    
+    if len(paths_to_mutate) == 1:
+        path_to_mutate_ = paths_to_mutate[0]
+
+        mut = mutations_by_file[path_to_mutate_]
+        mutations_by_file[path_to_mutate_] = []
+        for m in mut:
+            if line_start <= m.line_number < line_end:
+                mutations_by_file[path_to_mutate_].append(m)
+
+        if save_mutation_only:
+            with open(path_to_mutate_) as f:
+                source = f.read()
+            for i, id in enumerate(mutations_by_file[path_to_mutate_]):
+                context = Context(
+                    mutation_id=id,
+                    filename=path_to_mutate_,
+                    dict_synonyms=config.dict_synonyms,
+                    config=copy_obj(config),
+                    source=source,
+                    index=i,
+                )
+                mutate(context)
+                if save_mutation_to_folder:
+                    with open(os.path.join(save_mutation_to_folder, f"mutate_{i}.py"), 'w') as f:
+                        f.write(context.mutated_source)
+            return 0
 
     config.total = sum(len(mutations) for mutations in mutations_by_file.values())
 
