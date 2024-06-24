@@ -360,7 +360,8 @@ def create_report():
                'survived': len(mutants_by_status[BAD_SURVIVED]),
                'suspicious': len(mutants_by_status[OK_SUSPICIOUS]),
                'timeout': len(mutants_by_status[BAD_TIMEOUT]),
-               'killed_percent': (len(mutants_by_status[OK_KILLED]) + len(mutants_by_status[OK_SUSPICIOUS])) / len(mutants) * 100
+               'untested': len(mutants_by_status[UNTESTED]),
+               'killed_percent': (len(mutants_by_status[OK_KILLED]) + len(mutants_by_status[OK_SUSPICIOUS])) / (len(mutants) - len(mutants_by_status[UNTESTED])) * 100
             }
         results.append(result)
     return results
