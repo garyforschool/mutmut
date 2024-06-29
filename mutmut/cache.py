@@ -363,8 +363,8 @@ def create_report():
                'untested': len(mutants_by_status[UNTESTED]),
                'killed_percent': (len(mutants_by_status[OK_KILLED]) + len(mutants_by_status[OK_SUSPICIOUS])) / (len(mutants) - len(mutants_by_status[UNTESTED])) * 100
             }
-        for status in MUTANT_STATUSES:
-            result[f"{status}_ids"] = [x.id for x in mutants_by_status[status]]
+        for status in MUTANT_STATUSES.keys():
+            result[f"{status}_ids"] = [x.id for x in mutants_by_status[MUTANT_STATUSES[status]]]
         results.append(result)
     return results
 
