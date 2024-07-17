@@ -829,6 +829,7 @@ class Config:
     _default_test_command: str = field(init=False)
     covered_lines_by_filename: Optional[Dict[str, set[Optional[int]]]]
     baseline_time_elapsed: float
+    test_timeout_multiplier: float
     test_time_multiplier: float
     test_time_base: float
     dict_synonyms: List[str]
@@ -862,7 +863,7 @@ def tests_pass(config: Config, callback) -> bool:
     if use_special_case and config.test_command.startswith(hammett_prefix):
         return hammett_tests_pass(config, callback)
 
-    returncode = popen_streaming_output(config.test_command, callback, timeout=config.baseline_time_elapsed * 10)
+    returncode = popen_streaming_output(config.test_command, callback, timeout=config.baseline_time_elapsed * config.test_timeout_multiplier)
     return returncode != 1
 
 

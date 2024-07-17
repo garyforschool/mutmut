@@ -286,6 +286,7 @@ def do_run(
         covered_lines_by_filename=covered_lines_by_filename,
         coverage_data=coverage_data,
         baseline_time_elapsed=baseline_time_elapsed,
+        test_timeout_multiplier=3,
         dict_synonyms=dict_synonyms,
         using_testmon=using_testmon,
         tests_dirs=tests_dirs,
