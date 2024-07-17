@@ -287,6 +287,7 @@ def do_run(
         coverage_data=coverage_data,
         baseline_time_elapsed=baseline_time_elapsed,
         test_timeout_multiplier=3,
+        test_timeout_max=60 * 3,
         dict_synonyms=dict_synonyms,
         using_testmon=using_testmon,
         tests_dirs=tests_dirs,
